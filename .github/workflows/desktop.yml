@@ -1,0 +1,48 @@
+name: Desktop
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - apps/desktop/**
+      - .github/workflows/desktop.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: apps/desktop
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      # rust-toolchain.toml pins rune's toolchain; this installs it before caching
+      - name: Install toolchain
+        run: rustup show
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: apps/desktop
+
+      - name: Test
+        run: cargo test --release
+
+      - name: Build
+        run: cargo build --release
+
+      - name: Upload app
+        uses: actions/upload-artifact@v4
+        with:
+          name: octo-desktop
+          path: apps/desktop/target/release/octo.exe

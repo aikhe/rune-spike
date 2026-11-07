@@ -2,7 +2,7 @@
 
 use std::sync::LazyLock;
 
-use rune::{Color, TextStyle, hex};
+use rune::{Color, TextStyle, color::hex};
 
 use crate::snapshot::Provider;
 

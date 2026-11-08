@@ -9,8 +9,9 @@ name = "octo"
 path = "src/main.rs"
 
 [dependencies]
-# pre-release: pin a rev of rune's `dev`, which is never rewritten
-rune = { git = "https://github.com/anomalyco/rune", rev = "f73f72cdc563534e4f7de9f5a79bed007ac42384" }
+# pre-release, on a fork: aikhe/rune's `octo` branch is a rev of rune's `dev` plus a fix for
+# windows 10 drawing its own title bar over ours; rebase it onto a newer `dev` to update
+rune = { git = "https://github.com/aikhe/rune", rev = "5dc4502d65589060387c9aa84247254bfa707c51" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 tungstenite = { version = "0.26", default-features = false, features = ["handshake"] }

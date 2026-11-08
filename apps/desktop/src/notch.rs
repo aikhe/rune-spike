@@ -3,8 +3,8 @@
 //! like the screen edge it hangs from.
 
 use rune::{
-    Align, ConfiguredOverlay, Cx, Easing, El, LoopSpec, OverlayInput, OverlayOptions, OverlaySpec, ScreenEdge, Spring,
-    Transition, col, el, row, text,
+    Align, ConfiguredOverlay, Cx, Easing, El, LoopSpec, OverlayInput, OverlayOptions, OverlayPlacement, OverlaySpec,
+    ScreenEdge, Spring, Transition, col, el, row, text,
 };
 
 use crate::{
@@ -55,7 +55,18 @@ pub fn overlay(offset: f32) -> ConfiguredOverlay<Notch> {
         interactive: false,
         view,
     }
-    .options(OverlayOptions { input: OverlayInput::Regions, prewarm: true, ..Default::default() })
+    .options(OverlayOptions {
+        input: OverlayInput::Regions,
+        prewarm: true,
+        placement: Some(placement(offset)),
+        ..Default::default()
+    })
+}
+
+/// `offset` points down from the top of the screen. an edge placement measures from the
+/// display itself, where the spec's margin would start below app bars such as yasb's.
+pub fn placement(offset: f32) -> OverlayPlacement {
+    OverlayPlacement::Edge { edge: ScreenEdge::Top, margin: offset, align: Align::Center, inset: 0.0 }
 }
 
 fn view(n: &Notch, _: &mut Cx<Notch>) -> El {
@@ -84,9 +95,10 @@ fn providers(n: &Notch) -> Vec<(Provider, &Usage, bool)> {
         .collect()
 }
 
-/// what's left of a window in the cli's tone, or in the activity highlight with the sweep
-/// running across it while the cli works.
-fn bar(key: String, left: f64, provider: Provider, working: bool, p: Palette, height: f32) -> El {
+/// what's left of a window in the cli's tone, or in the activity highlight while the cli works.
+/// `sweep` also runs the band across it then; the closed pill stays still, so a long turn
+/// doesn't redraw the screen the whole time.
+fn bar(key: String, left: f64, provider: Provider, working: bool, sweep: bool, p: Palette, height: f32) -> El {
     let radius = height / 2.0;
     let fill = el()
         .key(format!("{key}-fill"))
@@ -95,7 +107,7 @@ fn bar(key: String, left: f64, provider: Provider, working: bool, p: Palette, he
         .radius(radius)
         .fill(if working { p.active } else { p.tone(provider) })
         .motion(Spring::SNAPPY);
-    let fill = if working {
+    let fill = if working && sweep {
         fill.clip_rounded(radius)
             .child(el().key(format!("{key}-sweep")).w_frac(0.4).h_full().fill(p.sheen.alpha(0.35)).looping(SWEEP))
     } else {
@@ -121,7 +133,7 @@ fn closed(n: &Notch, p: Palette) -> El {
                 .key(format!("{}-glance", provider.key()))
                 .gap(6.0)
                 .items_center()
-                .child(bar(format!("{}-mini", provider.key()), left, provider, working, p, 4.0).w(36.0))
+                .child(bar(format!("{}-mini", provider.key()), left, provider, working, false, p, 4.0).w(36.0))
                 .child(text(format!("{}%", left.round())).font(theme::NUMERIC).color(p.fg)),
         )
     })
@@ -168,7 +180,7 @@ fn window_row(provider: Provider, name: &'static str, w: &UsageWindow, working: 
         .items_center()
         .gap(10.0)
         .child(row().w(56.0).child(text(name).font(theme::LABEL).color(p.muted)))
-        .child(bar(format!("{key}-bar"), left, provider, working, p, 6.0).grow(1.0))
+        .child(bar(format!("{key}-bar"), left, provider, working, true, p, 6.0).grow(1.0))
         .child(row().w(36.0).justify_end().child(text(format!("{}%", left.round())).font(theme::NUMERIC).color(p.fg)))
         .child(row().w(52.0).justify_end().child(text(reset).font(theme::NUMERIC).color(p.faint)))
 }

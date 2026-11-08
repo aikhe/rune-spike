@@ -3,9 +3,17 @@
 
 use std::sync::{Mutex, OnceLock, PoisonError};
 
-use rune::{AppHandle, OverlayHandle, ScreenEdge, tray::Tray};
+use rune::{AppHandle, OverlayHandle, tray::Tray};
 
-use crate::{companion::Link, format::now_ms, notch::Notch, prefs::Prefs, settings::Settings, snapshot::Snapshot, tray};
+use crate::{
+    companion::Link,
+    format::now_ms,
+    notch::{self, Notch},
+    prefs::Prefs,
+    settings::Settings,
+    snapshot::Snapshot,
+    tray,
+};
 
 pub struct Shell {
     notch: OverlayHandle<Notch>,
@@ -63,7 +71,7 @@ impl Shell {
 
     pub fn set_notch_offset(&self, offset: f32) {
         self.change(|prefs| prefs.notch_offset = offset);
-        self.notch.place(ScreenEdge::Top, offset);
+        self.notch.set_placement(Some(notch::placement(offset)));
         self.notch.update(move |n, _| n.offset = offset);
     }
 

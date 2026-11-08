@@ -34,6 +34,8 @@ fn main() {
     })
     .windowless()
     .keep_running()
+    // settings opens rarely, so a closed window keeps no window or gpu memory; the notch holds the device
+    .release_gpu_when_closed()
     .window_options(WindowOptions { resizable: false, ..Default::default() });
     let notch = app.overlay(notch::overlay(prefs.notch_offset), notch::Notch::new(prefs.notch_offset));
     if prefs.show_notch {

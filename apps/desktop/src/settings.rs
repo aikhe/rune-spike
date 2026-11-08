@@ -1,4 +1,5 @@
-//! the settings window: a sidebar of pages, each a card of rows.
+//! the settings window: a sidebar of pages, each a card of rows, under a titlebar of its own
+//! that rune draws the window's caption buttons over.
 
 use rune::{Color, Cx, El, Spring, col, el, row, text};
 
@@ -10,6 +11,7 @@ use crate::{
 };
 
 pub const SIZE: (f32, f32) = (680.0, 440.0);
+pub const TITLEBAR: f32 = 40.0;
 /// how far the notch can be lowered, and by how much each press moves it, in points.
 const OFFSET_MAX: f32 = 96.0;
 const OFFSET_STEP: f32 = 4.0;
@@ -46,7 +48,8 @@ pub fn init() -> Settings {
 
 pub fn view(s: &Settings, cx: &mut Cx<Settings>) -> El {
     let p = theme::palette(cx.system_dark());
-    let sidebar = Page::ALL.into_iter().fold(col().key("sidebar").w(180.0).h_full().padding(12.0).gap(2.0), |nav, page| {
+    cx.caption_color(p.muted);
+    let sidebar = Page::ALL.into_iter().fold(col().key("sidebar").w(180.0).h_full().px(12.0).pb(12.0).gap(2.0), |nav, page| {
         nav.child(nav_item(page, s.page == page, p))
     });
     let body = match s.page {
@@ -54,16 +57,22 @@ pub fn view(s: &Settings, cx: &mut Cx<Settings>) -> El {
         Page::Companion => companion(s, p),
         Page::About => about(p),
     };
-    row().w_full().h_full().fill(p.bg).child(sidebar).child(
-        col()
-            .key("page")
-            .grow(1.0)
-            .h_full()
-            .padding(24.0)
-            .gap(16.0)
-            .child(text(s.page.name()).key("title").font(theme::TITLE).color(p.fg))
-            .child(body),
-    )
+    let page = col()
+        .key("page")
+        .grow(1.0)
+        .h_full()
+        .px(24.0)
+        .pb(24.0)
+        .gap(16.0)
+        .child(text(s.page.name()).key("title").font(theme::TITLE).color(p.fg))
+        .child(body);
+    // the band has no fill of its own, so the window reads as one surface
+    col()
+        .w_full()
+        .h_full()
+        .fill(p.bg)
+        .child(el().key("titlebar").w_full().h(TITLEBAR).window_drag())
+        .child(row().key("body").w_full().grow(1.0).child(sidebar).child(page))
 }
 
 fn nav_item(page: Page, selected: bool, p: Palette) -> El {

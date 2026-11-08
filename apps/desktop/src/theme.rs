@@ -1,4 +1,4 @@
-//! the app's dark palette and type (apps/mobile/src/theme.ts), on geist.
+//! the app's palettes and type (apps/mobile/src/theme.ts), on geist.
 
 use std::sync::LazyLock;
 
@@ -28,10 +28,8 @@ pub struct Palette {
     pub faint: Color,
     /// the activity highlight: a cli mid-turn.
     pub active: Color,
-    /// the notch, black like the screen edge it hangs from.
-    pub notch: Color,
-    /// limit bars' tracks inside the notch.
-    pub track: Color,
+    /// the band sweeping across an active bar.
+    pub sheen: Color,
     claude: Color,
     chatgpt: Color,
 }
@@ -58,11 +56,33 @@ pub static DARK: LazyLock<Palette> = LazyLock::new(|| Palette {
     muted: color("#a0a0a8"),
     faint: color("#6e6e76"),
     active: color("#4ade80"),
-    notch: color("#000000"),
-    track: color("#1a1a1a"),
+    sheen: color("#dcfce7"),
     claude: color("#d97757"),
     chatgpt: color("#e6e6e6"),
 });
+
+pub static LIGHT: LazyLock<Palette> = LazyLock::new(|| Palette {
+    bg: color("#f2f2f3"),
+    surface: color("#ffffff"),
+    raised: color("#e4e4e7"),
+    fg: color("#18181b"),
+    muted: color("#63636b"),
+    faint: color("#8e8e96"),
+    active: color("#16a34a"),
+    sheen: color("#86efac"),
+    claude: color("#d97757"),
+    chatgpt: color("#3c3c43"),
+});
+
+/// the notch, black like the screen edge it hangs from in either scheme.
+pub const NOTCH: Color = Color::BLACK;
+/// limit bars' tracks inside the notch.
+pub static TRACK: LazyLock<Color> = LazyLock::new(|| color("#1a1a1a"));
+
+/// the palette for the system's scheme.
+pub fn palette(dark: bool) -> Palette {
+    if dark { *DARK } else { *LIGHT }
+}
 
 /// a size with the app's -2% tracking.
 const fn tracked(size: f32, weight: f32) -> TextStyle {

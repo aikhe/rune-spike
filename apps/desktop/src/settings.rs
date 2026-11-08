@@ -6,10 +6,13 @@ use crate::{
     companion::Link,
     prefs::{Prefs, autostart},
     shell::shell,
-    theme::{self, DARK, Palette},
+    theme::{self, Palette},
 };
 
 pub const SIZE: (f32, f32) = (680.0, 440.0);
+/// how far the notch can be lowered, and by how much each press moves it, in points.
+const OFFSET_MAX: f32 = 96.0;
+const OFFSET_STEP: f32 = 4.0;
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub enum Page {
@@ -41,8 +44,8 @@ pub fn init() -> Settings {
     Settings { page: Page::General, prefs: Prefs::load(), autostart: autostart::enabled(), link: Link::Connecting }
 }
 
-pub fn view(s: &Settings, _: &mut Cx<Settings>) -> El {
-    let p = *DARK;
+pub fn view(s: &Settings, cx: &mut Cx<Settings>) -> El {
+    let p = theme::palette(cx.system_dark());
     let sidebar = Page::ALL.into_iter().fold(col().key("sidebar").w(180.0).h_full().padding(12.0).gap(2.0), |nav, page| {
         nav.child(nav_item(page, s.page == page, p))
     });
@@ -122,6 +125,25 @@ fn toggle(key: &str, label: &str, on: bool, p: Palette, flip: fn(&mut Settings))
         )
 }
 
+/// a round − or + that moves the notch's offset by `delta`, dimmed at the end it can't pass.
+fn nudge(key: &str, glyph: &'static str, label: &str, delta: f32, s: &Settings, p: Palette) -> El {
+    let next = (s.prefs.notch_offset + delta).clamp(0.0, OFFSET_MAX);
+    row()
+        .key(key.to_owned())
+        .role("button")
+        .label(label.to_owned())
+        .focusable(true)
+        .size(26.0, 26.0)
+        .radius(13.0)
+        .center()
+        .fill(p.raised)
+        .on_press(move |s: &mut Settings| {
+            s.prefs.notch_offset = next;
+            shell().set_notch_offset(next);
+        })
+        .child(text(glyph).font(theme::BODY).color(if next == s.prefs.notch_offset { p.faint } else { p.fg }))
+}
+
 fn value(label: String, color: Color) -> El {
     text(label).font(theme::BODY).color(color)
 }
@@ -148,6 +170,18 @@ fn general(s: &Settings, p: Palette) -> El {
                 s.prefs.show_notch = !s.prefs.show_notch;
                 shell().set_show_notch(s.prefs.show_notch);
             }),
+            p,
+        ))
+        .child(setting(
+            "offset",
+            "Notch offset",
+            Some("Lowers the notch below a bar at the top of your screen."),
+            row()
+                .gap(8.0)
+                .items_center()
+                .child(nudge("offset-down", "−", "Raise notch", -OFFSET_STEP, s, p))
+                .child(row().w(28.0).justify_center().child(text(format!("{}", s.prefs.notch_offset)).font(theme::NUMERIC).color(p.fg)))
+                .child(nudge("offset-up", "+", "Lower notch", OFFSET_STEP, s, p)),
             p,
         ))
 }

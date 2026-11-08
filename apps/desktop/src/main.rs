@@ -35,7 +35,7 @@ fn main() {
     .windowless()
     .keep_running()
     .window_options(WindowOptions { resizable: false, ..Default::default() });
-    let notch = app.overlay(notch::overlay(), notch::Notch::default());
+    let notch = app.overlay(notch::overlay(prefs.notch_offset), notch::Notch::new(prefs.notch_offset));
     if prefs.show_notch {
         notch.show();
     }

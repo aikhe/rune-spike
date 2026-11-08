@@ -3,7 +3,7 @@
 
 use std::sync::{Mutex, OnceLock, PoisonError};
 
-use rune::{AppHandle, OverlayHandle, tray::Tray};
+use rune::{AppHandle, OverlayHandle, ScreenEdge, tray::Tray};
 
 use crate::{companion::Link, format::now_ms, notch::Notch, prefs::Prefs, settings::Settings, snapshot::Snapshot, tray};
 
@@ -40,20 +40,31 @@ impl Shell {
         let _ = self.tray.set(tray);
     }
 
-    pub fn set_show_notch(&self, show: bool) {
+    /// changes the prefs, saves them and hands the settings window the new ones.
+    fn change(&self, f: impl FnOnce(&mut Prefs)) {
         let prefs = {
             let mut prefs = self.prefs.lock().unwrap_or_else(PoisonError::into_inner);
-            prefs.show_notch = show;
+            f(&mut prefs);
             *prefs
         };
         if let Err(e) = prefs.save() {
             eprintln!("octo: couldn't save prefs: {e}");
         }
+        self.settings.update(move |s, _| s.prefs = prefs);
+    }
+
+    pub fn set_show_notch(&self, show: bool) {
+        self.change(|prefs| prefs.show_notch = show);
         if show { self.notch.show() } else { self.notch.hide() }
         if let Some(tray) = self.tray.get() {
             tray.set_menu(tray::menu(show));
         }
-        self.settings.update(move |s, _| s.prefs.show_notch = show);
+    }
+
+    pub fn set_notch_offset(&self, offset: f32) {
+        self.change(|prefs| prefs.notch_offset = offset);
+        self.notch.place(ScreenEdge::Top, offset);
+        self.notch.update(move |n, _| n.offset = offset);
     }
 
     pub fn set_snapshot(&self, snapshot: Snapshot) {

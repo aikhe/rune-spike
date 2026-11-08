@@ -36,8 +36,10 @@ fn on_event(event: TrayEvent) {
     }
 }
 
-/// a white disc with an antialiased edge, readable on light and dark taskbars' trays.
+/// a disc with an antialiased edge, white on a dark taskbar and near-black on a light one.
+/// rune's tray can't swap its icon, so a theme change shows from the next launch.
 fn icon() -> TrayIcon {
+    let shade = if light_taskbar() { 24 } else { 255 };
     let center = ICON as f32 / 2.0;
     let radius = center - 4.0;
     let pixels = (0..ICON * ICON)
@@ -45,8 +47,23 @@ fn icon() -> TrayIcon {
             let (x, y) = ((i % ICON) as f32 + 0.5, (i / ICON) as f32 + 0.5);
             let distance = ((x - center).powi(2) + (y - center).powi(2)).sqrt();
             let alpha = (radius + 0.5 - distance).clamp(0.0, 1.0);
-            [255, 255, 255, (alpha * 255.0).round() as u8]
+            [shade, shade, shade, (alpha * 255.0).round() as u8]
         })
         .collect();
     TrayIcon::rgba(ICON, ICON, pixels)
+}
+
+/// windows themes the taskbar apart from apps, dark unless set otherwise.
+#[cfg(windows)]
+fn light_taskbar() -> bool {
+    use winreg::{RegKey, enums::HKEY_CURRENT_USER};
+    RegKey::predef(HKEY_CURRENT_USER)
+        .open_subkey(r"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize")
+        .and_then(|key| key.get_value::<u32, _>("SystemUsesLightTheme"))
+        .is_ok_and(|light| light == 1)
+}
+
+#[cfg(not(windows))]
+fn light_taskbar() -> bool {
+    false
 }

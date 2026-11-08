@@ -11,13 +11,15 @@ pub fn octo_home() -> PathBuf {
 #[serde(default, rename_all = "camelCase")]
 pub struct Prefs {
     pub show_notch: bool,
+    /// points the notch sits below the top of the screen, to clear a bar there.
+    pub notch_offset: f32,
     /// the companion's port on this pc.
     pub port: u16,
 }
 
 impl Default for Prefs {
     fn default() -> Self {
-        Prefs { show_notch: true, port: 8787 }
+        Prefs { show_notch: true, notch_offset: 0.0, port: 8787 }
     }
 }
 

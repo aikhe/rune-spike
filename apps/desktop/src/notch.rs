@@ -1,16 +1,17 @@
 //! the notch: a black pill hanging from the top of the screen with each cli's session left,
-//! opening on hover into both windows with their resets.
+//! opening on hover into both windows with their resets. it stays dark in a light scheme,
+//! like the screen edge it hangs from.
 
 use rune::{
-    Align, Color, ConfiguredOverlay, Cx, El, OverlayInput, OverlayOptions, OverlaySpec, ScreenEdge, Spring, Transition,
-    col, el, row, text,
+    Align, ConfiguredOverlay, Cx, Easing, El, LoopSpec, OverlayInput, OverlayOptions, OverlaySpec, ScreenEdge, Spring,
+    Transition, col, el, row, text,
 };
 
 use crate::{
     companion::Link,
     format::{duration, now_ms},
     snapshot::{Kind, Provider, Snapshot, Usage, UsageWindow},
-    theme::{self, DARK, Palette},
+    theme::{self, DARK, NOTCH, Palette, TRACK},
 };
 
 /// the overlay's fixed canvas, room for the opened notch; the window never resizes, so
@@ -19,27 +20,36 @@ const CANVAS: (f32, f32) = (400.0, 260.0);
 const CLOSED: (f32, f32) = (200.0, 30.0);
 const OPEN_WIDTH: f32 = 340.0;
 const RADIUS: f32 = 16.0;
-const CORNERS: [f32; 4] = [0.0, 0.0, RADIUS, RADIUS];
+/// square where it meets the screen edge.
+const HANGING: [f32; 4] = [0.0, 0.0, RADIUS, RADIUS];
+/// lowered below a bar at the top of the screen, it rounds all round.
+const FLOATING: [f32; 4] = [RADIUS; 4];
+/// the app's sweep: a band 40% of the fill wide crosses it at a constant speed in the first
+/// 60% of each 2s, from a band's width before it to just past its end (2.5 bands in), then
+/// carries on out of sight for the rest.
+const SWEEP: LoopSpec = LoopSpec::slide(2.0, [-1.0, 0.0], [-1.0 + 3.5 / 0.6, 0.0]).easing(Easing::LINEAR);
 
 pub struct Notch {
     pub snapshot: Option<Snapshot>,
     pub link: Link,
     pub open: bool,
     pub now: f64,
+    /// points below the top of the screen.
+    pub offset: f32,
 }
 
-impl Default for Notch {
-    fn default() -> Self {
-        Notch { snapshot: None, link: Link::Connecting, open: false, now: now_ms() }
+impl Notch {
+    pub fn new(offset: f32) -> Self {
+        Notch { snapshot: None, link: Link::Connecting, open: false, now: now_ms(), offset }
     }
 }
 
-pub fn overlay() -> ConfiguredOverlay<Notch> {
+pub fn overlay(offset: f32) -> ConfiguredOverlay<Notch> {
     OverlaySpec {
         name: "octo",
         size: CANVAS,
         edge: ScreenEdge::Top,
-        margin: 0.0,
+        margin: offset,
         align: Align::Center,
         inset: 0.0,
         interactive: false,
@@ -50,13 +60,14 @@ pub fn overlay() -> ConfiguredOverlay<Notch> {
 
 fn view(n: &Notch, _: &mut Cx<Notch>) -> El {
     let p = *DARK;
+    let corners = if n.offset > 0.0 { FLOATING } else { HANGING };
     let pill = col()
         .key("notch")
         .hit()
         .w(if n.open { OPEN_WIDTH } else { CLOSED.0 })
-        .corners(CORNERS)
-        .clip_corners(CORNERS)
-        .fill(p.notch)
+        .corners(corners)
+        .clip_corners(corners)
+        .fill(NOTCH)
         .motion(Spring::SNAPPY)
         .on_hover_change(|n: &mut Notch, inside, _| n.open = inside);
     let pill = if n.open { pill.padding(16.0).gap(16.0).child(opened(n, p)) } else { pill.h(CLOSED.1).child(closed(n, p)) };
@@ -73,17 +84,24 @@ fn providers(n: &Notch) -> Vec<(Provider, &Usage, bool)> {
         .collect()
 }
 
-/// a bar's color: the cli's tone, or the activity highlight while it works.
-fn bar_color(p: Palette, provider: Provider, working: bool) -> Color {
-    if working { p.active } else { p.tone(provider) }
-}
-
-fn bar(key: String, left: f64, color: Color, p: Palette, height: f32) -> El {
-    el().key(key.clone())
-        .h(height)
-        .radius(height / 2.0)
-        .fill(p.track)
-        .child(el().key(format!("{key}-fill")).w_frac(left as f32 / 100.0).h_full().radius(height / 2.0).fill(color).motion(Spring::SNAPPY))
+/// what's left of a window in the cli's tone, or in the activity highlight with the sweep
+/// running across it while the cli works.
+fn bar(key: String, left: f64, provider: Provider, working: bool, p: Palette, height: f32) -> El {
+    let radius = height / 2.0;
+    let fill = el()
+        .key(format!("{key}-fill"))
+        .w_frac(left as f32 / 100.0)
+        .h_full()
+        .radius(radius)
+        .fill(if working { p.active } else { p.tone(provider) })
+        .motion(Spring::SNAPPY);
+    let fill = if working {
+        fill.clip_rounded(radius)
+            .child(el().key(format!("{key}-sweep")).w_frac(0.4).h_full().fill(p.sheen.alpha(0.35)).looping(SWEEP))
+    } else {
+        fill
+    };
+    el().key(key).h(height).radius(radius).fill(*TRACK).child(fill)
 }
 
 /// a session gauge on each side, like the notch's ears.
@@ -103,7 +121,7 @@ fn closed(n: &Notch, p: Palette) -> El {
                 .key(format!("{}-glance", provider.key()))
                 .gap(6.0)
                 .items_center()
-                .child(bar(format!("{}-mini", provider.key()), left, bar_color(p, provider, working), p, 4.0).w(36.0))
+                .child(bar(format!("{}-mini", provider.key()), left, provider, working, p, 4.0).w(36.0))
                 .child(text(format!("{}%", left.round())).font(theme::NUMERIC).color(p.fg)),
         )
     })
@@ -150,7 +168,7 @@ fn window_row(provider: Provider, name: &'static str, w: &UsageWindow, working: 
         .items_center()
         .gap(10.0)
         .child(row().w(56.0).child(text(name).font(theme::LABEL).color(p.muted)))
-        .child(bar(format!("{key}-bar"), left, bar_color(p, provider, working), p, 6.0).grow(1.0))
+        .child(bar(format!("{key}-bar"), left, provider, working, p, 6.0).grow(1.0))
         .child(row().w(36.0).justify_end().child(text(format!("{}%", left.round())).font(theme::NUMERIC).color(p.fg)))
         .child(row().w(52.0).justify_end().child(text(reset).font(theme::NUMERIC).color(p.faint)))
 }
